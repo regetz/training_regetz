@@ -1,0 +1,55 @@
+---
+title: "Tidying and Wrangling"
+format: html
+---
+
+```{r}
+#| warning: false
+library(dplyr)
+library(tidyr)
+library(readr)
+library(ggplot2)
+```
+
+```{r}
+catch_original <- read_csv("https://knb.ecoinformatics.org/knb/d1/mn/v2/object/df35b.302.1")
+```
+```{r}
+colnames(catch_original)
+head(catch_original)
+```
+
+```{r}
+catch_data <- catch_original %>%
+    select(Region, Year, Chinook, Sockeye, Coho, Pink, Chum)
+```
+
+```{r}
+catch_clean <- catch_data %>%
+ mutate(Chinook = if_else(condition = Chinook == "I", 
+                             true = "1", 
+                             false = Chinook),
+           Chinook = as.numeric(Chinook))
+```
+
+```{r}
+catch_long <- catch_clean %>% 
+    pivot_longer(
+        cols = -c(Region, Year),
+        names_to = "species",
+        values_to = "catch"
+    ) %>%
+  rename(catch_thousands = catch) %>%
+  mutate(catch = catch_thousands * 1000) %>%
+  select(-catch_thousands)
+```
+```{r}
+region_defs <- read.csv("https://knb.ecoinformatics.org/knb/d1/mn/v2/object/df35b.303.1") %>% 
+  rename(Region = code, Region_Name = mgmtArea)
+```
+
+```{r}
+catch_joined <- left_join(catch_long, region_defs, by = c("Region"))
+catch_joined
+```
+
