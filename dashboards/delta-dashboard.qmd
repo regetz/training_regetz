@@ -1,0 +1,107 @@
+---
+title: "Delta Fish Monitoring"
+format:
+  dashboard:
+    theme: flatly
+---
+
+```{r}
+library(dplyr)
+library(lubridate)
+library(contentid)
+library(plotly)
+library(DT)
+
+sha1 <- "hash://sha1/317d7f840e598f5f3be732ab0e04f00a8051c6d0"
+delta_file <- contentid::resolve(sha1, registries = c("dataone"), store = TRUE)
+
+delta_data <- read.csv(delta_file) |>
+  mutate(SampleDate = mdy(SampleDate)) |>
+  filter(grepl("Salmon|Striped Bass|Smelt|Sturgeon", CommonName))
+```
+
+# Summary
+
+## Row {height="25%"}
+
+```{r}
+#| content: valuebox
+#| title: "Species Monitored"
+list(
+    icon = "binoculars",
+    color = "primary",
+    value = n_distinct(delta_data$CommonName)
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Years of Data"
+list(
+    icon = "calendar3",
+    color = "success",
+    value = n_distinct(year(delta_data$SampleDate))
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Total Observations"
+list(
+    icon = "table",
+    color = "info",
+    value = nrow(delta_data))
+```
+
+## Row {height="75%"}
+
+```{r}
+#| title: "Water Clarity Over Time"
+p <- delta_data |>
+  ggplot(aes(x = SampleDate, y = Secchi)) +
+  geom_point(color = "#2C7BB6", alpha = 0.4) +
+  labs(x = "Date", y = "Secchi depth (m)") +
+  theme_light()
+
+ggplotly(p)
+```
+
+```{r}
+#| title: "Catch by Species"
+delta_data |>
+  group_by(CommonName) |>
+  summarize(
+    Observations = n(),
+    `Total Catch` = sum(Count, na.rm = TRUE),
+    `Avg Secchi (m)` = round(mean(Secchi, na.rm = TRUE), 2)
+  ) |>
+ DT::datatable(rownames = FALSE, options = list(pageLength = 5))
+```
+
+# Catch Trends
+
+## Row {.tabset}
+
+```{r}
+#| title: "Annual Catch by Species"
+annual_catch <- delta_data |>
+  mutate(Year = year(SampleDate)) |>
+  group_by(Year, CommonName) |>
+  summarize(total_catch = sum(Count, na.rm = TRUE), .groups = "drop")
+
+p2 <- ggplot(annual_catch, aes(x = Year, y = total_catch, color = CommonName)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "Year", y = "Total Catch", color = "Species") +
+  theme_light()
+
+ggplotly(p2)
+```
+
+
+```{r}
+#| title: "Raw Data"
+delta_data |>
+  select(SampleDate, CommonName, Count, Secchi) |>
+  datatable(rownames = FALSE)
+```
